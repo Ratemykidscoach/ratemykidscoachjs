@@ -1,72 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-
-interface RatingState {
-  technical: number | null;
-  communication: number | null;
-  development: number | null;
-  attitude: number | null;
-  organization: number | null;
-}
-
-interface FormData {
-  reviewerName: string;
-  email: string;
-  phone: string;
-  coachTiming: 'current' | 'past' | '';
-  timeAgo: string;
-  clubName: string;
-  coachName: string;
-  teamGender: string;
-  ageGroup: string;
-  ratings: RatingState;
-  explanations: {
-    technical: string;
-    communication: string;
-    development: string;
-    attitude: string;
-    organization: string;
-  };
-  reviewText: string;
-}
 
 export default function ReviewForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coachTiming, setCoachTiming] = useState<'current' | 'past' | ''>('');
-  const [ratings, setRatings] = useState<RatingState>({
+  const [ratings, setRatings] = useState<{ [key: string]: number | null }>({
     technical: null,
     communication: null,
     development: null,
     attitude: null,
     organization: null,
   });
-  const [hoveredRating, setHoveredRating] = useState<{ category: string; value: number | null }>({
-    category: '',
-    value: null,
-  });
 
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     reviewerName: '',
     email: '',
     phone: '',
-    coachTiming: '',
     timeAgo: '',
     clubName: '',
     coachName: '',
     teamGender: '',
     ageGroup: '',
-    ratings: {
-      technical: null,
-      communication: null,
-      development: null,
-      attitude: null,
-      organization: null,
-    },
     explanations: {
       technical: '',
       communication: '',
@@ -76,6 +35,94 @@ export default function ReviewForm() {
     },
     reviewText: '',
   });
+
+  // Handle showing/hiding past coach time field
+  useEffect(() => {
+    if (coachTiming === 'past') {
+      const pastTimeElement = document.getElementById('pastCoachTime');
+      const timeAgoElement = document.getElementById('timeAgo') as HTMLSelectElement;
+      if (pastTimeElement) pastTimeElement.style.display = 'block';
+      if (timeAgoElement) timeAgoElement.required = true;
+    } else {
+      const pastTimeElement = document.getElementById('pastCoachTime');
+      const timeAgoElement = document.getElementById('timeAgo') as HTMLSelectElement;
+      if (pastTimeElement) pastTimeElement.style.display = 'none';
+      if (timeAgoElement) timeAgoElement.required = false;
+    }
+  }, [coachTiming]);
+
+  // Initialize star rating functionality
+  useEffect(() => {
+    const starContainers = document.querySelectorAll('.stars');
+    
+    starContainers.forEach((starContainer) => {
+      const stars = starContainer.querySelectorAll('.star');
+      const category = (starContainer as HTMLElement).dataset.category;
+      if (!category) return;
+
+      const hiddenInput = document.getElementById(`rating-${category}`) as HTMLInputElement;
+      if (!hiddenInput) return;
+
+      stars.forEach((star) => {
+        const starElement = star as HTMLElement;
+        const value = parseInt(starElement.dataset.value || '0');
+
+        // Click handler
+        starElement.addEventListener('click', function () {
+          hiddenInput.value = value.toString();
+          setRatings((prev) => ({
+            ...prev,
+            [category]: value,
+          }));
+
+          stars.forEach((s) => {
+            const sElement = s as HTMLElement;
+            const sValue = parseInt(sElement.dataset.value || '0');
+            if (sValue <= value) {
+              sElement.classList.add('active');
+            } else {
+              sElement.classList.remove('active');
+            }
+          });
+        });
+
+        // Hover handler
+        starElement.addEventListener('mouseenter', function () {
+          stars.forEach((s) => {
+            const sElement = s as HTMLElement;
+            const sValue = parseInt(sElement.dataset.value || '0');
+            if (sValue <= value) {
+              sElement.style.color = '#A8BCA1';
+            }
+          });
+        });
+      });
+
+      // Mouse leave handler for the container
+      starContainer.addEventListener('mouseleave', function () {
+        const currentValue = hiddenInput.value ? parseInt(hiddenInput.value) : null;
+        stars.forEach((s) => {
+          const sElement = s as HTMLElement;
+          const sValue = parseInt(sElement.dataset.value || '0');
+          if (currentValue && sValue <= currentValue) {
+            sElement.style.color = '#A8BCA1';
+          } else {
+            sElement.style.color = '#d4d4d4';
+          }
+        });
+      });
+    });
+
+    // Cleanup
+    return () => {
+      starContainers.forEach((container) => {
+        const stars = container.querySelectorAll('.star');
+        stars.forEach((star) => {
+          star.replaceWith(star.cloneNode(true));
+        });
+      });
+    };
+  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -107,39 +154,6 @@ export default function ReviewForm() {
     }));
   };
 
-  const handleStarClick = (category: keyof RatingState, value: number) => {
-    setRatings((prev) => ({
-      ...prev,
-      [category]: value,
-    }));
-    setFormData((prev) => ({
-      ...prev,
-      ratings: {
-        ...prev.ratings,
-        [category]: value,
-      },
-    }));
-  };
-
-  const handleStarHover = (category: string, value: number) => {
-    setHoveredRating({ category, value });
-  };
-
-  const handleStarLeave = () => {
-    setHoveredRating({ category: '', value: null });
-  };
-
-  const getStarColor = (category: string, starValue: number) => {
-    const currentRating = ratings[category as keyof RatingState];
-    const hoverValue = hoveredRating.category === category ? hoveredRating.value : null;
-    const displayValue = hoverValue ?? currentRating;
-
-    if (displayValue && starValue <= displayValue) {
-      return '#A8BCA1';
-    }
-    return '#d4d4d4';
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -151,7 +165,7 @@ export default function ReviewForm() {
       return;
     }
 
-    const ratingKeys: (keyof RatingState)[] = ['technical', 'communication', 'development', 'attitude', 'organization'];
+    const ratingKeys = ['technical', 'communication', 'development', 'attitude', 'organization'];
     const missingRatings = ratingKeys.filter((key) => !ratings[key]);
     if (missingRatings.length > 0) {
       alert('Please rate all categories before submitting.');
@@ -159,14 +173,10 @@ export default function ReviewForm() {
       return;
     }
 
-    // Calculate average rating
-    const avgRating =
-      Object.values(ratings).reduce((sum, val) => sum + (val || 0), 0) / ratingKeys.length;
-
     // Prepare data for Supabase
     const row = {
       reviewer_full_name: formData.reviewerName.trim(),
-      coach_timing: formData.coachTiming,
+      coach_timing: coachTiming,
       club_name: formData.clubName,
       coach_name: formData.coachName.trim(),
       team_gender: formData.teamGender,
@@ -204,38 +214,6 @@ export default function ReviewForm() {
       alert('An unexpected error occurred. Please try again.');
       setIsSubmitting(false);
     }
-  };
-
-  const StarRating = ({ category, label }: { category: keyof RatingState; label: string }) => {
-    return (
-      <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
-        <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
-          {label} *
-        </label>
-        <div className="star-rating">
-          {[1, 2, 3, 4, 5].map((value) => (
-            <span
-              key={value}
-              className="star"
-              data-value={value}
-              onClick={() => handleStarClick(category, value)}
-              onMouseEnter={() => handleStarHover(category, value)}
-              onMouseLeave={handleStarLeave}
-              style={{ color: getStarColor(category, value) }}
-            >
-              ★
-            </span>
-          ))}
-        </div>
-        <textarea
-          name={`explanation-${category}`}
-          value={formData.explanations[category]}
-          onChange={handleInputChange}
-          className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed"
-          placeholder="Optional: Explain the rating you gave"
-        />
-      </div>
-    );
   };
 
   return (
@@ -351,26 +329,24 @@ export default function ReviewForm() {
               </div>
             </div>
 
-            {coachTiming === 'past' && (
-              <div className="mb-6">
-                <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                  How long ago did they coach your child? *
-                </label>
-                <select
-                  name="timeAgo"
-                  value={formData.timeAgo}
-                  onChange={handleInputChange}
-                  required={coachTiming === 'past'}
-                  className="w-full px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[15px] transition-all duration-300 font-sans bg-[#FAFAFA] text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)]"
-                >
-                  <option value="">Select timeframe</option>
-                  <option value="within-1-year">Within the last year</option>
-                  <option value="1-2-years">1-2 years ago</option>
-                  <option value="2-3-years">2-3 years ago</option>
-                  <option value="3-plus-years">3+ years ago</option>
-                </select>
-              </div>
-            )}
+            <div id="pastCoachTime" className="mb-6 hidden">
+              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
+                How long ago did they coach your child? *
+              </label>
+              <select
+                name="timeAgo"
+                id="timeAgo"
+                value={formData.timeAgo}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[15px] transition-all duration-300 font-sans bg-[#FAFAFA] text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)]"
+              >
+                <option value="">Select timeframe</option>
+                <option value="within-1-year">Within the last year</option>
+                <option value="1-2-years">1-2 years ago</option>
+                <option value="2-3-years">2-3 years ago</option>
+                <option value="3-plus-years">3+ years ago</option>
+              </select>
+            </div>
 
             <div className="mb-6">
               <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
@@ -475,11 +451,110 @@ export default function ReviewForm() {
               Rate each category from 1-5 stars. Your overall rating will be the average of these categories.
             </p>
 
-            <StarRating category="technical" label="Coaching Ability / Technical Skills" />
-            <StarRating category="communication" label="Communication with Parents" />
-            <StarRating category="development" label="Player Development" />
-            <StarRating category="attitude" label="Attitude / Positivity" />
-            <StarRating category="organization" label="Organization / Professionalism" />
+            <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
+              <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
+                Coaching Ability / Technical Skills *
+              </label>
+              <div className="star-rating stars" data-category="technical">
+                <span className="star" data-value="1">★</span>
+                <span className="star" data-value="2">★</span>
+                <span className="star" data-value="3">★</span>
+                <span className="star" data-value="4">★</span>
+                <span className="star" data-value="5">★</span>
+              </div>
+              <input type="hidden" id="rating-technical" required />
+              <textarea
+                name="explanation-technical"
+                value={formData.explanations.technical}
+                onChange={handleInputChange}
+                className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed placeholder:text-[#9a9a9a]"
+                placeholder="Optional: Explain the rating you gave"
+              />
+            </div>
+
+            <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
+              <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
+                Communication with Parents *
+              </label>
+              <div className="star-rating stars" data-category="communication">
+                <span className="star" data-value="1">★</span>
+                <span className="star" data-value="2">★</span>
+                <span className="star" data-value="3">★</span>
+                <span className="star" data-value="4">★</span>
+                <span className="star" data-value="5">★</span>
+              </div>
+              <input type="hidden" id="rating-communication" required />
+              <textarea
+                name="explanation-communication"
+                value={formData.explanations.communication}
+                onChange={handleInputChange}
+                className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed placeholder:text-[#9a9a9a]"
+                placeholder="Optional: Explain the rating you gave"
+              />
+            </div>
+
+            <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
+              <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
+                Player Development *
+              </label>
+              <div className="star-rating stars" data-category="development">
+                <span className="star" data-value="1">★</span>
+                <span className="star" data-value="2">★</span>
+                <span className="star" data-value="3">★</span>
+                <span className="star" data-value="4">★</span>
+                <span className="star" data-value="5">★</span>
+              </div>
+              <input type="hidden" id="rating-development" required />
+              <textarea
+                name="explanation-development"
+                value={formData.explanations.development}
+                onChange={handleInputChange}
+                className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed placeholder:text-[#9a9a9a]"
+                placeholder="Optional: Explain the rating you gave"
+              />
+            </div>
+
+            <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
+              <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
+                Attitude / Positivity *
+              </label>
+              <div className="star-rating stars" data-category="attitude">
+                <span className="star" data-value="1">★</span>
+                <span className="star" data-value="2">★</span>
+                <span className="star" data-value="3">★</span>
+                <span className="star" data-value="4">★</span>
+                <span className="star" data-value="5">★</span>
+              </div>
+              <input type="hidden" id="rating-attitude" required />
+              <textarea
+                name="explanation-attitude"
+                value={formData.explanations.attitude}
+                onChange={handleInputChange}
+                className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed placeholder:text-[#9a9a9a]"
+                placeholder="Optional: Explain the rating you gave"
+              />
+            </div>
+
+            <div className="bg-[#F9F7F4] p-5 rounded-sm border-l-[3px] border-[#A8BCA1] mb-8">
+              <label className="block font-medium text-[#2d2d2d] mb-3 text-[15px] tracking-wide">
+                Organization / Professionalism *
+              </label>
+              <div className="star-rating stars" data-category="organization">
+                <span className="star" data-value="1">★</span>
+                <span className="star" data-value="2">★</span>
+                <span className="star" data-value="3">★</span>
+                <span className="star" data-value="4">★</span>
+                <span className="star" data-value="5">★</span>
+              </div>
+              <input type="hidden" id="rating-organization" required />
+              <textarea
+                name="explanation-organization"
+                value={formData.explanations.organization}
+                onChange={handleInputChange}
+                className="w-full min-h-[70px] mt-3 px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[14px] transition-all duration-300 font-sans bg-white text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] resize-y leading-relaxed placeholder:text-[#9a9a9a]"
+                placeholder="Optional: Explain the rating you gave"
+              />
+            </div>
           </div>
 
           {/* Written Review */}
@@ -523,6 +598,3 @@ export default function ReviewForm() {
     </div>
   );
 }
-
-
-
