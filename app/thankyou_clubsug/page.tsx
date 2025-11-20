@@ -58,6 +58,14 @@ export default function ThankYouClubSug() {
         >
           ← Back to Home
         </Link>
+
+        <footer className="mt-8 pt-6 border-t border-[#EDE6DB]">
+          <p className="text-xs text-[#6b6b6b]">
+            <Link href="/terms" className="text-[#6b6b6b] hover:text-[#A8BCA1] hover:underline transition-colors">
+              Terms of Service
+            </Link>
+          </p>
+        </footer>
       </div>
     </div>
   );

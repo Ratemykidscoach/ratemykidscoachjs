@@ -165,7 +165,12 @@ export default function Home() {
       <footer className="bg-[#1a1a1a] text-white py-10 px-5 text-center">
         <div className="max-w-6xl mx-auto">
           <p className="mb-2.5 text-[15px]">Rate My Kids Coach - A BYU Sandbox Project</p>
-          <p className="text-sm opacity-70">Starting with soccer, expanding to all youth sports.</p>
+          <p className="text-sm opacity-70 mb-3">Starting with soccer, expanding to all youth sports.</p>
+          <p className="text-xs opacity-50">
+            <Link href="/terms" className="text-white hover:underline">
+              Terms of Service
+            </Link>
+          </p>
         </div>
       </footer>
     </div>

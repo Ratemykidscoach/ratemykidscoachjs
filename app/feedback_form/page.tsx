@@ -342,6 +342,15 @@ export default function FeedbackForm() {
             </button>
           </form>
         </div>
+
+        {/* Footer */}
+        <footer className="mt-12 pt-8 border-t border-[#EDE6DB] text-center">
+          <p className="text-xs text-[#6b6b6b]">
+            <Link href="/terms" className="text-[#6b6b6b] hover:text-[#A8BCA1] hover:underline transition-colors">
+              Terms of Service
+            </Link>
+          </p>
+        </footer>
       </div>
     </div>
   );
