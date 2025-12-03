@@ -148,6 +148,7 @@ export default function Home() {
             >
               Review a Coach
             </Link>
+            
             <Link
               href="/feedback_form"
               className="inline-block bg-transparent text-white border-2 border-white px-12 py-[18px] text-lg font-semibold no-underline rounded-sm transition-all duration-300 tracking-wider uppercase hover:bg-white hover:text-[#1a1a1a] w-full md:w-auto max-w-[300px]"
