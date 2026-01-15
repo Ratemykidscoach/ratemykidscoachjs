@@ -5,10 +5,32 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
+// Map club -> state (more reliable than reading <optgroup> labels)
+const CLUB_STATE: Record<string, 'utah' | 'arizona'> = {
+  // Utah
+  'La Roca FC': 'utah',
+  'RSL Academy': 'utah',
+  'Forza FC': 'utah',
+  'Impact United Soccer Club': 'utah',
+  'Utah Avalanche Soccer Club': 'utah',
+  'Utah Arsenal FC': 'utah',
+
+  // Arizona
+  'Phoenix Rising FC Youth': 'arizona',
+  'RSL-AZ': 'arizona',
+  'Arizona Arsenal SC': 'arizona',
+  'FC Tucson Youth Soccer': 'arizona',
+  'Arizona Soccer Club (AZSC)': 'arizona',
+  'FC Arizona': 'arizona',
+  'Soccer Club Del Sol': 'arizona',
+  'Phoenix Rush SC': 'arizona',
+};
+
 export default function ReviewForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coachTiming, setCoachTiming] = useState<'current' | 'past' | ''>('');
+
   const [ratings, setRatings] = useState<{ [key: string]: number | null }>({
     technical: null,
     communication: null,
@@ -23,6 +45,7 @@ export default function ReviewForm() {
     phone: '',
     timeAgo: '',
     clubName: '',
+    state: '', // will become "utah" or "arizona"
     coachName: '',
     teamGender: '',
     ageGroup: '',
@@ -38,14 +61,13 @@ export default function ReviewForm() {
 
   // Handle showing/hiding past coach time field
   useEffect(() => {
+    const pastTimeElement = document.getElementById('pastCoachTime');
+    const timeAgoElement = document.getElementById('timeAgo') as HTMLSelectElement | null;
+
     if (coachTiming === 'past') {
-      const pastTimeElement = document.getElementById('pastCoachTime');
-      const timeAgoElement = document.getElementById('timeAgo') as HTMLSelectElement;
       if (pastTimeElement) pastTimeElement.style.display = 'block';
       if (timeAgoElement) timeAgoElement.required = true;
     } else {
-      const pastTimeElement = document.getElementById('pastCoachTime');
-      const timeAgoElement = document.getElementById('timeAgo') as HTMLSelectElement;
       if (pastTimeElement) pastTimeElement.style.display = 'none';
       if (timeAgoElement) timeAgoElement.required = false;
     }
@@ -54,18 +76,18 @@ export default function ReviewForm() {
   // Initialize star rating functionality
   useEffect(() => {
     const starContainers = document.querySelectorAll('.stars');
-    
+
     starContainers.forEach((starContainer) => {
       const stars = starContainer.querySelectorAll('.star');
       const category = (starContainer as HTMLElement).dataset.category;
       if (!category) return;
 
-      const hiddenInput = document.getElementById(`rating-${category}`) as HTMLInputElement;
+      const hiddenInput = document.getElementById(`rating-${category}`) as HTMLInputElement | null;
       if (!hiddenInput) return;
 
       stars.forEach((star) => {
         const starElement = star as HTMLElement;
-        const value = parseInt(starElement.dataset.value || '0');
+        const value = parseInt(starElement.dataset.value || '0', 10);
 
         // Click handler
         starElement.addEventListener('click', function () {
@@ -77,12 +99,9 @@ export default function ReviewForm() {
 
           stars.forEach((s) => {
             const sElement = s as HTMLElement;
-            const sValue = parseInt(sElement.dataset.value || '0');
-            if (sValue <= value) {
-              sElement.classList.add('active');
-            } else {
-              sElement.classList.remove('active');
-            }
+            const sValue = parseInt(sElement.dataset.value || '0', 10);
+            if (sValue <= value) sElement.classList.add('active');
+            else sElement.classList.remove('active');
           });
         });
 
@@ -90,25 +109,20 @@ export default function ReviewForm() {
         starElement.addEventListener('mouseenter', function () {
           stars.forEach((s) => {
             const sElement = s as HTMLElement;
-            const sValue = parseInt(sElement.dataset.value || '0');
-            if (sValue <= value) {
-              sElement.style.color = '#A8BCA1';
-            }
+            const sValue = parseInt(sElement.dataset.value || '0', 10);
+            if (sValue <= value) sElement.style.color = '#A8BCA1';
           });
         });
       });
 
       // Mouse leave handler for the container
       starContainer.addEventListener('mouseleave', function () {
-        const currentValue = hiddenInput.value ? parseInt(hiddenInput.value) : null;
+        const currentValue = hiddenInput.value ? parseInt(hiddenInput.value, 10) : null;
         stars.forEach((s) => {
           const sElement = s as HTMLElement;
-          const sValue = parseInt(sElement.dataset.value || '0');
-          if (currentValue && sValue <= currentValue) {
-            sElement.style.color = '#A8BCA1';
-          } else {
-            sElement.style.color = '#d4d4d4';
-          }
+          const sValue = parseInt(sElement.dataset.value || '0', 10);
+          if (currentValue && sValue <= currentValue) sElement.style.color = '#A8BCA1';
+          else sElement.style.color = '#d4d4d4';
         });
       });
     });
@@ -128,8 +142,10 @@ export default function ReviewForm() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+
+    // explanations
     if (name.startsWith('explanation-')) {
-      const category = name.replace('explanation-', '');
+      const category = name.replace('explanation-', '') as keyof typeof formData.explanations;
       setFormData((prev) => ({
         ...prev,
         explanations: {
@@ -137,21 +153,33 @@ export default function ReviewForm() {
           [category]: value,
         },
       }));
-    } else {
+      return;
+    }
+
+    // clubName -> set both clubName + state
+    if (name === 'clubName') {
+      const detectedState = CLUB_STATE[value] || '';
       setFormData((prev) => ({
         ...prev,
-        [name]: value,
+        clubName: value,
+        state: detectedState,
       }));
+      return;
     }
+
+    // default
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleCoachTimingChange = (value: 'current' | 'past') => {
     setCoachTiming(value);
-    setFormData((prev) => ({
-      ...prev,
-      coachTiming: value,
-      timeAgo: value === 'current' ? '' : prev.timeAgo,
-    }));
+    // If switching to "current", clear timeAgo
+    if (value === 'current') {
+      setFormData((prev) => ({ ...prev, timeAgo: '' }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,7 +193,7 @@ export default function ReviewForm() {
       return;
     }
 
-    const ratingKeys = ['technical', 'communication', 'development', 'attitude', 'organization'];
+    const ratingKeys = ['technical', 'communication', 'development', 'attitude', 'organization'] as const;
     const missingRatings = ratingKeys.filter((key) => !ratings[key]);
     if (missingRatings.length > 0) {
       alert('Please rate all categories before submitting.');
@@ -178,6 +206,7 @@ export default function ReviewForm() {
       reviewer_full_name: formData.reviewerName.trim(),
       coach_timing: coachTiming,
       club_name: formData.clubName,
+      state: formData.state || null,
       coach_name: formData.coachName.trim(),
       team_gender: formData.teamGender,
       age_group: formData.ageGroup,
@@ -198,7 +227,7 @@ export default function ReviewForm() {
     };
 
     try {
-      const { data, error } = await supabase.from('review_form').insert([row]).select();
+      const { error } = await supabase.from('review_form').insert([row]);
 
       if (error) {
         console.error('Error inserting review into Supabase:', error);
@@ -207,8 +236,8 @@ export default function ReviewForm() {
         return;
       }
 
-      // Redirect to thank you page
-      router.push('/thankyou_review');
+      router.push('/thankyou_review?submitted=1');
+
     } catch (err) {
       console.error('Unexpected error submitting review:', err);
       alert('An unexpected error occurred. Please try again.');
@@ -231,7 +260,7 @@ export default function ReviewForm() {
             Leave a Coach Review
           </h1>
           <p className="text-[15px] text-[#6b6b6b] font-normal tracking-wide">
-            Help other parents make informed decisions about their child's soccer coach
+            Help other parents make informed decisions about their child&apos;s soccer coach
           </p>
         </div>
 
@@ -239,6 +268,7 @@ export default function ReviewForm() {
           {/* Reviewer Information */}
           <div className="mb-12">
             <h2 className="text-xl font-semibold text-[#1a1a1a] mb-6 tracking-tight">Your Information</h2>
+
             <div className="mb-6">
               <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
                 Full Name *
@@ -253,11 +283,10 @@ export default function ReviewForm() {
                 className="w-full px-4 py-3.5 border-[1.5px] border-[#d4d4d4] rounded-sm text-[15px] transition-all duration-300 font-sans bg-[#FAFAFA] text-[#1a1a1a] focus:outline-none focus:border-[#A8BCA1] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,188,161,0.1)] placeholder:text-[#9a9a9a]"
               />
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
               <div>
-                <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                  Email
-                </label>
+                <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">Email</label>
                 <input
                   type="email"
                   name="email"
@@ -281,6 +310,7 @@ export default function ReviewForm() {
                 />
               </div>
             </div>
+
             <p className="text-[13px] text-[#6b6b6b] -mt-2 font-normal">
               * At least one contact method required for verification
             </p>
@@ -288,13 +318,11 @@ export default function ReviewForm() {
 
           {/* Coach Information */}
           <div className="mb-12">
-            <h2 className="text-xl font-semibold text-[#1a1a1a] mb-6 tracking-tight">
-              Coach & Team Information
-            </h2>
+            <h2 className="text-xl font-semibold text-[#1a1a1a] mb-6 tracking-tight">Coach & Team Information</h2>
 
             <div className="mb-6">
               <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                Is this your child's current coach or a past coach? *
+                Is this your child&apos;s current coach or a past coach? *
               </label>
               <div className="flex gap-6 mt-2.5">
                 <div className="flex items-center gap-2.5">
@@ -349,9 +377,7 @@ export default function ReviewForm() {
             </div>
 
             <div className="mb-6">
-              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                Club Name *
-              </label>
+              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">Club Name *</label>
               <select
                 name="clubName"
                 value={formData.clubName}
@@ -383,14 +409,15 @@ export default function ReviewForm() {
                 href="/feedback_form"
                 className="inline-block mt-3 text-[#A8BCA1] text-sm no-underline font-medium tracking-wide transition-colors duration-300 hover:text-[#8a9d85]"
               >
-                Don't see your club? Help us add it!
+                Don&apos;t see your club? Help us add it!
               </Link>
+
+              {/* Optional: shows what you're about to save */}
+              {/* <p className="text-xs mt-2 text-[#6b6b6b]">Detected state: {formData.state || '(none)'}</p> */}
             </div>
 
             <div className="mb-6">
-              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                Coach Name *
-              </label>
+              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">Coach Name *</label>
               <input
                 type="text"
                 name="coachName"
@@ -421,9 +448,7 @@ export default function ReviewForm() {
             </div>
 
             <div className="mb-6">
-              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                Age Group/Team *
-              </label>
+              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">Age Group/Team *</label>
               <select
                 name="ageGroup"
                 value={formData.ageGroup}
@@ -564,7 +589,7 @@ export default function ReviewForm() {
             <div className="bg-[#F9F7F4] border-l-[3px] border-[#B79973] p-5 mb-5 rounded-sm text-sm text-[#4a4a4a] leading-7">
               <strong className="text-[#1a1a1a] font-semibold">Please keep your review constructive and helpful:</strong>
               <ul className="mt-2.5 ml-5">
-                <li className="mb-1.5">Focus on the coach's abilities and approach, not outcomes like playing time</li>
+                <li className="mb-1.5">Focus on the coach&apos;s abilities and approach, not outcomes like playing time</li>
                 <li className="mb-1.5">Be specific and fact-based rather than overly emotional</li>
                 <li className="mb-1.5">Avoid hurtful language or personal attacks</li>
                 <li className="mb-1.5">Remember that coaches and directors may read these reviews</li>
@@ -572,9 +597,7 @@ export default function ReviewForm() {
             </div>
 
             <div className="mb-6">
-              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">
-                Your Review *
-              </label>
+              <label className="block font-medium text-[#2d2d2d] mb-2.5 text-sm tracking-wide">Your Review *</label>
               <textarea
                 name="reviewText"
                 value={formData.reviewText}
