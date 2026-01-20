@@ -12,12 +12,21 @@ export default function Home() {
           <p className="text-lg md:text-[22px] text-white mb-10 font-normal opacity-95">
             Bringing transparency and accountability to youth sports coaching. Starting with soccer, expanding to all youth sports as we grow.
           </p>
-          <Link
-            href="/review_form"
-            className="inline-block bg-white text-[#1a1a1a] px-12 py-[18px] text-lg font-semibold no-underline rounded-sm transition-all duration-300 tracking-wider uppercase shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(0,0,0,0.25)]"
-          >
-            Review a Coach
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+  <Link
+    href="/review_form"
+    className="inline-flex justify-center items-center bg-white text-[#1a1a1a] px-12 py-[18px] text-lg font-semibold no-underline rounded-sm transition-all duration-300 tracking-wider uppercase shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(0,0,0,0.25)] w-full sm:w-auto min-w-[260px]"
+  >
+    Review a Coach
+  </Link>
+
+  <Link
+    href="/reviews"
+    className="inline-flex justify-center items-center bg-white text-[#1a1a1a] px-12 py-[18px] text-lg font-semibold no-underline rounded-sm transition-all duration-300 tracking-wider uppercase shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(0,0,0,0.25)] w-full sm:w-auto min-w-[260px]"
+  >
+    Browse Reviews
+  </Link>
+</div>
         </div>
       </section>
 
